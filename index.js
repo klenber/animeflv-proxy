@@ -74,4 +74,10 @@ app.get("/animeflv/video", async (req, res) => {
   }
 });
 
-app.listen(3000, () => console.log("🔥 AnimeFLV proxy listo"));
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log("🔥 AnimeFLV proxy corriendo en puerto", PORT);
+});
+
+
