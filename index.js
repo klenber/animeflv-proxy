@@ -40,45 +40,86 @@ app.get("/animeflv/search", async (req, res) => {
 ====================== */
 app.get("/animeflv/episodes/:id", async (req, res) => {
   try {
-    const { data } = await axios.get(`${BASE}/anime/${req.params.id}`);
-    const $ = cheerio.load(data);
+    const { id } = req.params;
+
+    const url = `https://animeflv.net/anime/${id}`;
+    const html = await axios.get(url).then(r => r.data);
+    const $ = cheerio.load(html);
 
     const episodes = [];
 
-    $("ul.ListEpisodes li a").each((_, el) => {
-      episodes.push({
-        numero: $(el).text().trim(),
-        url: $(el).attr("href")
-      });
+    $("ul.ListCaps li a").each((_, el) => {
+      const epUrl = $(el).attr("href");
+      if (epUrl) {
+        episodes.push({
+          url: "https://animeflv.net" + epUrl
+        });
+      }
     });
 
     res.json(episodes.reverse());
   } catch (e) {
-    res.status(500).json({ error: "episodes failed" });
+    console.error("❌ Episodes error", e);
+    res.json([]);
   }
 });
+
 
 /* ======================
    VIDEO REAL
 ====================== */
 app.get("/animeflv/video", async (req, res) => {
   try {
-    const { data } = await axios.get(req.query.url);
-    const match = data.match(/https?:\/\/[^"]+\.(mp4|m3u8)/);
+    const episodeUrl = req.query.url;
 
-    if (!match) return res.status(404).json({ error: "video not found" });
+    const html = await axios.get(episodeUrl).then(r => r.data);
+    const $ = cheerio.load(html);
 
-    res.json({ video: match[0] });
+    let videoUrl = null;
+
+    $("iframe").each((_, el) => {
+      const src = $(el).attr("src");
+      if (src && src.includes("embed")) {
+        videoUrl = src;
+      }
+    });
+
+    if (!videoUrl) {
+      return res.json({ error: "video not found" });
+    }
+
+    // redirección al embed
+    const embedHtml = await axios.get(videoUrl).then(r => r.data);
+    const _$ = cheerio.load(embedHtml);
+
+    let finalVideo = null;
+
+    _$("script").each((_, el) => {
+      const txt = _$(el).html();
+      if (txt && txt.includes(".m3u8")) {
+        const match = txt.match(/https?:\/\/[^"]+\.m3u8/);
+        if (match) finalVideo = match[0];
+      }
+    });
+
+    if (!finalVideo) {
+      return res.json({ error: "stream not found" });
+    }
+
+    res.json({ video: finalVideo });
   } catch (e) {
-    res.status(500).json({ error: "video failed" });
+    console.error("❌ Video error", e);
+    res.json({ error: "video error" });
   }
 });
+
 
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
   console.log("🔥 AnimeFLV proxy corriendo en puerto", PORT);
 });
+
 
 
 
