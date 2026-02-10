@@ -1,2 +1,2 @@
 # animeflv-proxy
-# animeflv-extractors
+# animeflv-extractor
